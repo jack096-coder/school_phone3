@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>教職員工分機語音查詢系統</title>
+    
+    <!-- PWA 必備標籤 -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#f0f2f5">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    
+    <style>
+        /* 保留您原本的所有 CSS，此處省略以節省版面 */
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif, 'Microsoft JhengHei'; background-color: #f0f2f5; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+        .container { background-color: white; border-radius: 16px; padding: 40px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; max-width: 800px; width: 100%; }
+        .mic-btn { background-color: #007bff; color: white; border: none; border-radius: 50%; width: 100px; height: 100px; font-size: 40px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; }
+        .mic-btn.listening { background-color: #dc3545; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); } 70% { box-shadow: 0 0 0 20px rgba(220, 53, 69, 0); } 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); } }
+        #status { font-size: 18px; color: #444; margin-bottom: 20px; min-height: 27px; font-weight: bold; }
+        #result-container { margin-top: 20px; display: none; text-align: left; }
+    </style>
+    <!-- 引入外部套件 -->
+    <script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3.16.4/dist/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<div class="container">
+    <button id="micBtn" class="mic-btn">🎙️</button>
+    <div id="status">準備就緒，請點擊麥克風</div>
+    <div id="result-container"></div>
+</div>
+
+<script>
+    // 註冊 Service Worker 讓網頁具備 APP 安裝能力
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js').catch(err => console.log('SW 註冊失敗', err));
+        });
+    }
+
+    const statusDiv = document.getElementById('status');
+    const micBtn = document.getElementById('micBtn');
+
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(stream => stream.getTracks().forEach(track => track.stop()))
+            .catch(err => {
+                statusDiv.textContent = '⚠️ 請允許麥克風權限才能使用語音查詢功能';
+                statusDiv.style.color = '#dc3545';
+            });
+    }
+
+    // 將您原本的 database 邏輯與 searchDatabase 函數貼在這裡
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition;
+
+    if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.lang = 'zh-TW';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        recognition.onstart = function() {
+            micBtn.classList.add('listening');
+            statusDiv.textContent = '聆聽中...請說話';
+            statusDiv.style.color = '#444';
+        };
+
+        recognition.onresult = function(event) {
+            const transcript = event.results[0][0].transcript.replace(/\s+/g, '');
+            statusDiv.textContent = `您說了：「${transcript}」`;
+            // searchDatabase(transcript); // 呼叫您的搜尋邏輯
+        };
+
+        recognition.onerror = function(event) {
+            statusDiv.textContent = '發生錯誤，請確認您已授予麥克風權限。';
+            statusDiv.style.color = '#dc3545';
+            micBtn.classList.remove('listening');
+        };
+
+        recognition.onend = function() {
+            micBtn.classList.remove('listening');
+        };
+
+        micBtn.addEventListener('click', () => { recognition.start(); });
+    } else {
+        statusDiv.textContent = '不支援語音辨識，請確保使用 Chrome 瀏覽器或 PWA。';
+        statusDiv.style.color = '#dc3545';
+        micBtn.disabled = true;
+    }
+</script>
+</body>
+</html>
